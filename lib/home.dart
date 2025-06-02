@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 
+void main() {
+  runApp(const MaterialApp(home: HomePage()));
+}
+
 class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
@@ -8,76 +12,186 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {  // Changed to TickerProviderStateMixin
   bool lightIsOn = true;
+  bool _isSidebarOpen = false;
   late AnimationController _controller;
-  late Animation<double> _rotationAnimation;
-  double _currentAngle = 0;
+  late AnimationController _sidebarController;
+  late Animation<double> _sweepAnimation;
+  late Animation<Offset> _sidebarAnimation;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
-    _rotationAnimation = AlwaysStoppedAnimation(_currentAngle);
+    
+    // Initialize light toggle controller and animation
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
+    _sweepAnimation = Tween<double>(begin: 1.0, end: 1.0).animate(_controller);
+
+    // Initialize sidebar controller and animation
+    _sidebarController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _sidebarAnimation = Tween<Offset>(
+      begin: const Offset(-1, 0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _sidebarController,
+      curve: Curves.easeInOut,
+    ));
   }
 
-void toggleLight() {
-  final targetAngle = lightIsOn ? _currentAngle : _currentAngle + (2 * pi); // full spin when turning ON
+  @override
+  void dispose() {
+    _controller.dispose();
+    _sidebarController.dispose();
+    super.dispose();
+  }
 
-  _rotationAnimation = Tween<double>(
-    begin: _currentAngle,
-    end: targetAngle,
-  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut))
-    ..addListener(() {
-      setState(() {});
-    })
-    ..addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _currentAngle = targetAngle;
+  void toggleLight() {
+    final newBegin = lightIsOn ? 1.0 : 0.0;
+    final newEnd = lightIsOn ? 0.0 : 1.0;
+
+    _sweepAnimation = Tween<double>(begin: newBegin, end: newEnd).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    )..addListener(() {
+        setState(() {});
+      });
+
+    _controller.forward(from: 0);
+
+    setState(() {
+      lightIsOn = !lightIsOn;
+    });
+  }
+
+  void toggleSidebar() {
+    setState(() {
+      _isSidebarOpen = !_isSidebarOpen;
+      if (_isSidebarOpen) {
+        _sidebarController.forward();
+      } else {
+        _sidebarController.reverse();
       }
     });
+  }
 
-  _controller.forward(from: 0);
-  setState(() {
-    lightIsOn = !lightIsOn;
-  });
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 231, 230, 230),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildGreeting(),
-              const SizedBox(height: 24.0),
-              _buildPowerCard(),
-              const SizedBox(height: 45.0),
-              Center(child: _buildCircularToggle()),
-              const SizedBox(height: 32.0),
-              _buildRoomStatusRow(),
-              const SizedBox(height: 32.0),
-              _buildDataLogButton(context),
-            ],
-          ),
+  Widget _buildSidebar() {
+    return SlideTransition(
+      position: _sidebarAnimation,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.7,
+        color: const Color(0xFF001F54),
+        padding: const EdgeInsets.only(top: 50, left: 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Menu',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 30),
+            _buildSidebarItem(Icons.settings, 'General'),
+            _buildSidebarItem(Icons.notifications, 'Notifications'),
+            _buildSidebarItem(Icons.analytics, 'Data Log'),
+            const Spacer(),
+            _buildSidebarItem(Icons.logout, 'Log Out'),
+            const SizedBox(height: 30),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildGreeting() {
+  Widget _buildSidebarItem(IconData icon, String title) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.white),
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 18),
+      ),
+      onTap: () {
+        toggleSidebar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('$title pressed')),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color.fromARGB(255, 231, 230, 230),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: Column(
+              children: [
+                _buildHeader(),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildPowerCard(),
+                        _buildCircularToggle(),
+                        _buildDataLogButton(context),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Semi-transparent overlay
+          if (_isSidebarOpen)
+            GestureDetector(
+              onTap: toggleSidebar,
+              child: Container(
+                color: Colors.black54,
+                width: double.infinity,
+                height: double.infinity,
+              ),
+            ),
+          // Sidebar
+          _buildSidebar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
     return Container(
-      child: const Text(
-        'Hello, Tim',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.w600,
-        ),
-      )
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+      color: const Color(0xFF001F54),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onPressed: toggleSidebar,
+          ),
+          const Text(
+            'Hello, Tim',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -88,22 +202,16 @@ void toggleLight() {
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(color: const Color.fromARGB(255, 179, 177, 177), blurRadius: 2, offset: const Offset(0, 4)),
-        ]
+        ],
       ),
-      margin: const EdgeInsets.symmetric(vertical: 25),
+      margin: const EdgeInsets.symmetric(vertical: 5),
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Room Consumption',
-            style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Colors.black87),
-          ),
+          const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Colors.black87)),
           const SizedBox(height: 2),
-          const Text(
-            '8‑watt smart light',
-            style: TextStyle(fontSize: 14, color: Colors.black),
-          ),
+          const Text('8‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
           const SizedBox(height: 35),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -122,11 +230,8 @@ void toggleLight() {
       children: [
         Container(
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 37, 37, 37),
+            color: const Color(0xFF001F54),
             borderRadius: BorderRadius.circular(90),
-            // boxShadow: [
-            //   BoxShadow(color: const Color.fromARGB(255, 28, 28, 28), blurRadius: 4, offset: const Offset(0, 2)),
-            // ],
           ),
           padding: const EdgeInsets.all(10),
           child: Icon(icon, size: 24, color: Colors.white),
@@ -145,93 +250,63 @@ void toggleLight() {
   }
 
   Widget _buildCircularToggle() {
-  const double dialSize = 250;
-  const double strokeWidth = 20;
+    const double dialSize = 230;
+    const double strokeWidth = 15;
 
-  return GestureDetector(
-    onTap: toggleLight,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        Transform.rotate(
-          angle: _rotationAnimation.value,
-          child: CustomPaint(
+    return GestureDetector(
+      onTap: toggleLight,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          CustomPaint(
             size: const Size(dialSize, dialSize),
             painter: RingPainter(
               strokeWidth: strokeWidth,
-              color: lightIsOn ? Colors.amber : Colors.grey,
-              gapAngle: lightIsOn ? 0 : 40, // full circle if ON, gap if OFF
+              color: Colors.grey.shade400,
+              sweepFraction: 1.0,
             ),
           ),
-        ),
-        AnimatedOpacity(
-          duration: const Duration(milliseconds: 400),
-          opacity: lightIsOn ? 1.0 : 0.5,
-          child: AnimatedScale(
+          CustomPaint(
+            size: const Size(dialSize, dialSize),
+            painter: RingPainter(
+              strokeWidth: strokeWidth,
+              color: const Color(0xFF001F54),
+              sweepFraction: _sweepAnimation.value,
+            ),
+          ),
+          AnimatedOpacity(
             duration: const Duration(milliseconds: 400),
-            scale: lightIsOn ? 1.05 : 0.9,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.transparent, // NO background glow
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.lightbulb,
-                    size: lightIsOn ? 48 : 40,
-                    color: lightIsOn ? Colors.amber : Colors.grey,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    lightIsOn ? 'ON' : 'OFF',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ],
-    ),
-  );
-}
-
-
-  Widget _buildRoomStatusRow() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Room Status',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: List.generate(3, (index) {
-            return Container(
-              width: 100,
-              height: 80,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.circle,
-                  size: 32,
-                  color: Colors.grey,
+            opacity: lightIsOn ? 1.0 : 0.5,
+            child: AnimatedScale(
+              duration: const Duration(milliseconds: 400),
+              scale: lightIsOn ? 1.05 : 0.9,
+              child: Container(
+                width: 90,
+                height: 90,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.transparent,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.lightbulb,
+                      size: lightIsOn ? 55 : 50,
+                      color: lightIsOn ? Colors.amber : Colors.grey,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      lightIsOn ? 'ON' : 'OFF',
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
                 ),
               ),
-            );
-          }),
-        ),
-      ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -250,32 +325,26 @@ void toggleLight() {
             const SnackBar(content: Text('Data Log pressed')),
           );
         },
-        child: const Text(
-          'Data Log',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-        ),
+        child: const Text('Data Log', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
       ),
     );
   }
 }
 
-// 🎨 Painter for the rotating ring with a gap
 class RingPainter extends CustomPainter {
   final double strokeWidth;
-  final double gapAngle; // in degrees
+  final double sweepFraction;
   final Color color;
 
   RingPainter({
     required this.strokeWidth,
-    required this.gapAngle,
+    required this.sweepFraction,
     required this.color,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final startAngle = gapAngle * pi / 180;
-    final sweepAngle = (360 - gapAngle) * pi / 180;
+    final sweepAngle = 2 * pi * sweepFraction;
 
     final paint = Paint()
       ..color = color
@@ -285,7 +354,7 @@ class RingPainter extends CustomPainter {
 
     canvas.drawArc(
       Rect.fromCircle(center: size.center(Offset.zero), radius: size.width / 2 - strokeWidth / 2),
-      startAngle,
+      -pi / 2,
       sweepAngle,
       false,
       paint,

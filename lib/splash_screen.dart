@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:animated_splash_screen/animated_splash_screen.dart';
 import 'package:lottie/lottie.dart';
 import 'package:sgt/login_page.dart';
+import 'package:sgt/home.dart';
 
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
@@ -40,7 +41,7 @@ class SplashScreen extends StatelessWidget {
         ],
       ),
       backgroundColor: Color(0xFF001F54), // Navy blue background
-      nextScreen: const LoginPage(),
+      nextScreen: const HomePage(),
       splashIconSize: 250, // Makes room for both text + animation
       splashTransition: SplashTransition.fadeTransition,
     );
