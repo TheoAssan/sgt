@@ -1,0 +1,9 @@
+flutter_native_splash:
+  color: "0xFF001F54"  # Navy blue background
+  image: assets/
+  android: true
+  ios: true
+  fullscreen: true
+  android_12:
+    color: "0xFF001F54"
+    image: assets/
