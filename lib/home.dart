@@ -1,48 +1,39 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'sidebar.dart';
 
 void main() {
   runApp(const MaterialApp(home: HomePage()));
 }
 
 class HomePage extends StatefulWidget {
-  const HomePage({Key? key}) : super(key: key);
+  const HomePage({super.key});
 
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> with TickerProviderStateMixin {  // Changed to TickerProviderStateMixin
+class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   bool lightIsOn = true;
   bool _isSidebarOpen = false;
   late AnimationController _controller;
   late AnimationController _sidebarController;
   late Animation<double> _sweepAnimation;
-  late Animation<Offset> _sidebarAnimation;
 
   @override
   void initState() {
     super.initState();
     
-    // Initialize light toggle controller and animation
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
     _sweepAnimation = Tween<double>(begin: 1.0, end: 1.0).animate(_controller);
 
-    // Initialize sidebar controller and animation
     _sidebarController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
     );
-    _sidebarAnimation = Tween<Offset>(
-      begin: const Offset(-1, 0),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _sidebarController,
-      curve: Curves.easeInOut,
-    ));
   }
 
   @override
@@ -80,117 +71,63 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {  //
     });
   }
 
-  Widget _buildSidebar() {
-    return SlideTransition(
-      position: _sidebarAnimation,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.7,
-        color: const Color(0xFF001F54),
-        padding: const EdgeInsets.only(top: 50, left: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Menu',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 30),
-            _buildSidebarItem(Icons.settings, 'General'),
-            _buildSidebarItem(Icons.notifications, 'Notifications'),
-            _buildSidebarItem(Icons.analytics, 'Data Log'),
-            const Spacer(),
-            _buildSidebarItem(Icons.logout, 'Log Out'),
-            const SizedBox(height: 30),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSidebarItem(IconData icon, String title) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.white),
-      title: Text(
-        title,
-        style: const TextStyle(color: Colors.white, fontSize: 18),
-      ),
-      onTap: () {
-        toggleSidebar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$title pressed')),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Sidebar(),
       backgroundColor: const Color.fromARGB(255, 231, 230, 230),
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        _buildPowerCard(),
-                        _buildCircularToggle(),
-                        _buildDataLogButton(context),
-                      ],
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF001F54),
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Row(
+          children: [
+            Spacer(),
+            RichText(
+              text: TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'SMARTGLOW ',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          // Semi-transparent overlay
-          if (_isSidebarOpen)
-            GestureDetector(
-              onTap: toggleSidebar,
-              child: Container(
-                color: Colors.black54,
-                width: double.infinity,
-                height: double.infinity,
+                  TextSpan(
+                    text: 'GT',
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
               ),
             ),
-          // Sidebar
-          _buildSidebar(),
-        ],
+          ],
+        ),
+        elevation: 0,
       ),
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-      color: const Color(0xFF001F54),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white),
-            onPressed: toggleSidebar,
-          ),
-          const Text(
-            'Hello, Tim',
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.w600,
-              color: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 16.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _buildPowerCard(),
+                    _buildCircularToggle(),
+                    _buildDataLogButton(context),
+                  ],
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -209,15 +146,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {  //
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Colors.black87)),
+          const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Color(0xFF001F54))),
           const SizedBox(height: 2),
           const Text('8‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
           const SizedBox(height: 35),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildPowerMetric(icon: Icons.flash_on, value: '5 kWh', label: 'This month'),
-              _buildPowerMetric(icon: Icons.electrical_services, value: '120 kWh', label: 'Total'),
+              _buildPowerMetric(icon: Icons.flash_on, value: '5 kWh', label: 'This month'),
+              _buildPowerMetric(icon: Icons.electrical_services, value: '120 kWh', label: 'Total'),
             ],
           ),
         ],
@@ -353,7 +290,8 @@ class RingPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
-      Rect.fromCircle(center: size.center(Offset.zero), radius: size.width / 2 - strokeWidth / 2),
+      Rect.fromCircle(center: size.center(Offset.zero), 
+      radius: size.width / 2 - strokeWidth / 2),
       -pi / 2,
       sweepAngle,
       false,
