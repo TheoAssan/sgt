@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 class SettingsPage extends StatefulWidget {
+  const SettingsPage({super.key});
+
   @override
   _SettingsPageState createState() => _SettingsPageState();
 }
@@ -9,7 +11,7 @@ class _SettingsPageState extends State<SettingsPage> {
   // State variables for toggle switches
   bool _motionDetectionEnabled = true;
   bool _deviceAlertsEnabled = true;
-  bool _automationAlertsEnabled = false;
+  bool _automationAlertsEnabled = true;
 
   // State variables for sliders and dropdown
   double _sensitivity = 75.0;
@@ -94,7 +96,7 @@ class _SettingsPageState extends State<SettingsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Sensitivity', style: TextStyle(fontSize: 14)),
+        Text('Sensitivity', style: TextStyle(fontSize: 18)),
         Slider(
           value: _sensitivity,
           min: 25,
@@ -112,10 +114,10 @@ class _SettingsPageState extends State<SettingsPage> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('25%', style: TextStyle(fontSize: 12)),
-              Text('50%', style: TextStyle(fontSize: 12)),
-              Text('75%', style: TextStyle(fontSize: 12)),
-              Text('100%', style: TextStyle(fontSize: 12)),
+              Text('25%', style: TextStyle(fontSize: 16)),
+              Text('50%', style: TextStyle(fontSize: 16)),
+              Text('75%', style: TextStyle(fontSize: 16)),
+              Text('100%', style: TextStyle(fontSize: 16)),
             ],
           ),
         ),

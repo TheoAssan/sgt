@@ -79,14 +79,41 @@ class Sidebar extends StatelessWidget {
               ],
             ),
           ),
-          Divider(),
-          ListTile(
-            leading: Icon(Icons.logout, color: Colors.red),
-            title: Text('Log Out', style: TextStyle(color: Colors.red)),
-            onTap: () {
-              // TODO: Add log out functionality
-              Navigator.pop(context);
-            },
+          const Divider(
+            height: 1,
+            thickness: 1,
+            indent: 16,
+            endIndent: 16,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 48.0), // Increased bottom padding to move Log Out higher
+            child: ListTile(
+              leading: Icon(Icons.logout, color: Colors.red),
+              title: Text('Log Out', style: TextStyle(color: Colors.red)),
+              onTap: () async {
+                final shouldLogout = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Text('Log Out'),
+                    content: Text('Are you sure you want to log out?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: Text('Cancel'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        child: Text('Log Out', style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+                if (shouldLogout == true) {
+                  Navigator.of(context).pop(); // Close drawer
+                  Navigator.of(context).pushReplacementNamed('/login');
+                }
+              },
+            ),
           ),
         ],
       ),
