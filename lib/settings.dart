@@ -15,7 +15,7 @@ class _SettingsPageState extends State<SettingsPage> {
 
   // State variables for sliders and dropdown
   double _sensitivity = 75.0;
-  String _activationDelay = '5';
+  String _deactivationDelay = '5';
   bool _showDelayOptions = false;
 
   @override
@@ -46,7 +46,7 @@ class _SettingsPageState extends State<SettingsPage> {
               children: [
                 _buildSensitivitySlider(),
                 SizedBox(height: 16),
-                _buildActivationDelaySelector(),
+                _buildDeactivationDelaySelector(),
                 SizedBox(height: 16),
                 _buildListTile(
                   icon: Icons.schedule,
@@ -125,20 +125,20 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildActivationDelaySelector() {
+  Widget _buildDeactivationDelaySelector() {
     return Column(
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(
-            'Activation Delay',
+            'Deactivation Delay',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                '$_activationDelay seconds',
+                '$_deactivationDelay minutes',
                 style: TextStyle(
                   color: Colors.blue,
                   fontSize: 16,
@@ -158,13 +158,13 @@ class _SettingsPageState extends State<SettingsPage> {
           },
         ),
         if (_showDelayOptions) ...[
-          ...['3', '5', '8'].map((delay) => ListTile(
+          ...['3', '5', '10'].map((delay) => ListTile(
             contentPadding: EdgeInsets.only(left: 16, right: 16),
-            title: Text('$delay seconds'),
-            tileColor: _activationDelay == delay ? Colors.blue.withOpacity(0.1) : null,
+            title: Text('$delay minutes'),
+            tileColor: _deactivationDelay == delay ? Colors.blue.withOpacity(0.1) : null,
             onTap: () {
               setState(() {
-                _activationDelay = delay;
+                _deactivationDelay = delay;
                 _showDelayOptions = false;
               });
             },
