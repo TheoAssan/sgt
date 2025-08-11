@@ -103,10 +103,11 @@ class _SettingsPageState extends State<SettingsPage> {
           max: 100,
           divisions: 3,
           label: '${_sensitivity.toInt()}%',
-          onChanged: (newValue) {
+          onChanged: (newValue) async {
             setState(() {
               _sensitivity = newValue;
             });
+            // You can add your own logic here to handle sensitivity changes
           },
         ),
         Padding(
@@ -162,11 +163,12 @@ class _SettingsPageState extends State<SettingsPage> {
             contentPadding: EdgeInsets.only(left: 16, right: 16),
             title: Text('$delay minutes'),
             tileColor: _deactivationDelay == delay ? Colors.blue.withOpacity(0.1) : null,
-            onTap: () {
+            onTap: () async {
               setState(() {
                 _deactivationDelay = delay;
                 _showDelayOptions = false;
               });
+              // You can add your own logic here to handle delay changes
             },
           )),
         ],

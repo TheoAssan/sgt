@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:sgt/splash_screen.dart';
+import 'package:sgt/login_page.dart'; // Add this import
 
 void main() {
   runApp(const MyApp());
@@ -73,6 +74,10 @@ class MyApp extends StatelessWidget {
         ),
       ),
       home: const SplashScreen(),
+      routes: {
+        '/login': (context) => const LoginPage(), // Register the login route
+        // Add other routes here if needed
+      },
     );
   }
 }

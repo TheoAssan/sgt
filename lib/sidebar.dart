@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:sgt/settings.dart'; 
+import 'package:sgt/settings.dart';
+import 'package:sgt/data_log.dart';
+import 'package:sgt/power_consumption.dart'; // Add this import
 
 // ignore: use_key_in_widget_constructors
 class Sidebar extends StatelessWidget {
@@ -64,16 +66,48 @@ class Sidebar extends StatelessWidget {
                   leading: Icon(Icons.list_alt, color: Color(0xFF001F54)),
                   title: Text('Data Log', style: TextStyle(color: Colors.black)),
                   onTap: () {
-                    // TODO: Add navigation to Data Log page
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        transitionDuration: Duration(milliseconds: 450),
+                        pageBuilder: (context, animation, secondaryAnimation) => DataLogPage(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(1.0, 0.0); // Slide from right
+                          const end = Offset.zero;
+                          const curve = Curves.ease;
+                          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          return SlideTransition(
+                            position: animation.drive(tween),
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.notifications, color: Color(0xFF001F54)),
-                  title: Text('Notifications', style: TextStyle(color: Colors.black)),
+                  leading: Icon(Icons.bolt, color: Color(0xFF001F54)),
+                  title: Text('Power Consumption', style: TextStyle(color: Colors.black)),
                   onTap: () {
-                    // TODO: Add navigation to Notifications page
                     Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        transitionDuration: Duration(milliseconds: 450),
+                        pageBuilder: (context, animation, secondaryAnimation) => PowerConsumptionPage(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(1.0, 0.0); // Slide from right
+                          const end = Offset.zero;
+                          const curve = Curves.ease;
+                          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          return SlideTransition(
+                            position: animation.drive(tween),
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
                   },
                 ),
               ],
@@ -86,7 +120,7 @@ class Sidebar extends StatelessWidget {
             endIndent: 16,
           ),
           Padding(
-            padding: const EdgeInsets.only(bottom: 48.0), // Increased bottom padding to move Log Out higher
+            padding: const EdgeInsets.only(bottom: 48.0),
             child: ListTile(
               leading: Icon(Icons.logout, color: Colors.red),
               title: Text('Log Out', style: TextStyle(color: Colors.red)),
@@ -109,8 +143,10 @@ class Sidebar extends StatelessWidget {
                   ),
                 );
                 if (shouldLogout == true) {
-                  Navigator.of(context).pop(); // Close drawer
-                  Navigator.of(context).pushReplacementNamed('/login');
+                  Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
+                    '/login',
+                    (Route<dynamic> route) => false,
+                  );
                 }
               },
             ),

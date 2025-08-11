@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'sidebar.dart';
+import 'power_consumption.dart'; // Add this import
 
 void main() {
   runApp(const MaterialApp(home: HomePage()));
@@ -58,6 +59,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     setState(() {
       lightIsOn = !lightIsOn;
     });
+
+    // You can add your own logic here to handle light state changes
   }
 
   void toggleSidebar() {
@@ -151,31 +154,50 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   }
 
   Widget _buildPowerCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 235, 235, 235),
-        borderRadius: BorderRadius.circular(25),
-        boxShadow: [
-          BoxShadow(color: const Color.fromARGB(255, 179, 177, 177), blurRadius: 2, offset: const Offset(0, 4)),
-        ],
-      ),
-      margin: const EdgeInsets.symmetric(vertical: 5),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Color(0xFF001F54))),
-          const SizedBox(height: 2),
-          const Text('8‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
-          const SizedBox(height: 35),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildPowerMetric(icon: Icons.flash_on, value: '5 kWh', label: 'This month'),
-              _buildPowerMetric(icon: Icons.electrical_services, value: '120 kWh', label: 'Total'),
-            ],
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          PageRouteBuilder(
+            transitionDuration: Duration(milliseconds: 500),
+            pageBuilder: (context, animation, secondaryAnimation) => PowerConsumptionPage(),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              final scale = Tween<double>(begin: 0.9, end: 1.0).animate(
+                CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
+              );
+              return ScaleTransition(
+                scale: scale,
+                child: child,
+              );
+            },
           ),
-        ],
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: const Color.fromARGB(255, 235, 235, 235),
+          borderRadius: BorderRadius.circular(25),
+          boxShadow: [
+            BoxShadow(color: const Color.fromARGB(255, 179, 177, 177), blurRadius: 2, offset: const Offset(0, 4)),
+          ],
+        ),
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Color(0xFF001F54))),
+            const SizedBox(height: 2),
+            const Text('8‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
+            const SizedBox(height: 35),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildPowerMetric(icon: Icons.flash_on, value: '5 kWh', label: 'This week'),
+                _buildPowerMetric(icon: Icons.electrical_services, value: '120 kWh', label: 'Total'),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

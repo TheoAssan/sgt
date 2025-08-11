@@ -38,6 +38,7 @@ dependencies:
   animated_splash_screen: ^1.2.0
   flutter_native_splash: ^2.4.6
   icons_plus: ^5.0.0
+  mqtt_client: ^10.0.0
  
 
 dev_dependencies:
