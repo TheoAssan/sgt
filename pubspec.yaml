@@ -38,7 +38,11 @@ dependencies:
   animated_splash_screen: ^1.2.0
   flutter_native_splash: ^2.4.6
   icons_plus: ^5.0.0
-  mqtt_client: ^10.0.0
+  mqtt_client: ^10.9.2
+  flutter_dotenv: ^5.1.0
+  typed_data: ^1.4.0
+  intl: ^0.19.0
+  http: ^1.2.1
  
 
 dev_dependencies:
@@ -51,7 +55,12 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
-  
+  flutter_launcher_icons: ^0.13.1
+
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon.png"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -96,5 +105,6 @@ flutter:
   # see https://flutter.dev/to/font-from-package
   assets:
     - assets/
-
+    - .env
+ 
 

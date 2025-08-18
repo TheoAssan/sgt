@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'sidebar.dart';
-import 'power_consumption.dart'; // Add this import
+import 'power_consumption.dart';
+import 'mqtt.dart'; // Import the real service
+import 'dart:async'; // Import for StreamSubscription
 
 void main() {
   runApp(const MaterialApp(home: HomePage()));
@@ -15,25 +17,107 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
-  bool lightIsOn = true;
+  bool lightIsOn = false;
   bool _isSidebarOpen = false;
+  bool _isConnected = false; // <-- Add this
+  bool _pendingToggle = false;
+  bool _pendingTargetState = false;
   late AnimationController _controller;
   late AnimationController _sidebarController;
   late Animation<double> _sweepAnimation;
+  late AdafruitIOService mqttService; // Add this
+  StreamSubscription<bool>? _lightStateSub;
 
   @override
   void initState() {
     super.initState();
-    
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 700),
     );
-    _sweepAnimation = Tween<double>(begin: 1.0, end: 1.0).animate(_controller);
+    _sweepAnimation = Tween<double>(begin: 0.0, end: 0.0).animate(_controller);
 
     _sidebarController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 300),
+    );
+
+    mqttService = AdafruitIOService(
+      showNotification: (msg) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(msg),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.only(top: 40, left: 10, right: 10),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+    );
+
+    // Auto-connect on startup
+    _autoConnect();
+
+    // Listen to light state changes from MQTT
+    _lightStateSub = mqttService.lightStateStream.listen((isOn) {
+      if (mounted) {
+        // Only update if the device state disagrees with the optimistic state
+        if (_pendingToggle && isOn == _pendingTargetState) {
+          _pendingToggle = false;
+          // No correction needed, UI already matches
+        } else if (isOn != lightIsOn) {
+          setState(() {
+            lightIsOn = isOn;
+            final newBegin = isOn ? 0.0 : 1.0;
+            final newEnd = isOn ? 1.0 : 0.0;
+            _sweepAnimation = Tween<double>(begin: newBegin, end: newEnd).animate(
+              CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+            )..addListener(() {
+                setState(() {});
+              });
+            _controller.forward(from: 0);
+          });
+        }
+      }
+    });
+  }
+
+  Future<void> _autoConnect() async {
+    try {
+      bool connected = await mqttService.connect();
+      if (mounted) {
+        setState(() {
+          _isConnected = connected;
+        });
+      }
+    } catch (e) {
+      // Error notification already handled in mqttService
+    }
+  }
+
+  void _showDisconnectDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disconnect'),
+        content: const Text('Are you sure you want to disconnect from MQTT?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              mqttService.disconnect();
+              setState(() {
+                _isConnected = false;
+              });
+              Navigator.of(context).pop();
+            },
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -41,12 +125,14 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   void dispose() {
     _controller.dispose();
     _sidebarController.dispose();
+    _lightStateSub?.cancel();
     super.dispose();
   }
 
   void toggleLight() {
-    final newBegin = lightIsOn ? 1.0 : 0.0;
-    final newEnd = lightIsOn ? 0.0 : 1.0;
+    final wasOn = lightIsOn;
+    final newBegin = wasOn ? 1.0 : 0.0;
+    final newEnd = wasOn ? 0.0 : 1.0;
 
     _sweepAnimation = Tween<double>(begin: newBegin, end: newEnd).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
@@ -58,9 +144,24 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
 
     setState(() {
       lightIsOn = !lightIsOn;
+      _pendingToggle = true;
+      _pendingTargetState = lightIsOn;
     });
 
-    // You can add your own logic here to handle light state changes
+    // Send MQTT command to ESP32
+    if (_isConnected) {
+      final cmd = lightIsOn ? "LIGHT ON(MANUAL)" : "LIGHT OFF(MANUAL)";
+      mqttService.publish("TeslaOw/feeds/ld2410c-feeds.light-state", cmd);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Not connected to MQTT"),
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.only(top: 40, left: 10, right: 10),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   void toggleSidebar() {
@@ -79,15 +180,32 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
+          backgroundColor: _isConnected ? Colors.white : const Color(0xFF001F54),
+          foregroundColor: _isConnected ? const Color(0xFF001F54) : Colors.white,
+          side: const BorderSide(
+            color: Color(0xFF001F54),
+            width: 2,
+          ),
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        onPressed: () {
-          // Add your connect logic here
+        onPressed: () async {
+          if (_isConnected) {
+            _showDisconnectDialog();
+          } else {
+            await _autoConnect();
+          }
         },
-        child: const Text('Connect', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+        child: Text(
+          _isConnected ? 'Disconnect' : 'Connect',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: _isConnected ? const Color(0xFF001F54) : Colors.white,
+          ),
+        ),
       ),
     );
   }

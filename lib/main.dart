@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:sgt/splash_screen.dart';
-import 'package:sgt/login_page.dart'; // Add this import
+import 'package:sgt/login_page.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env"); // <-- Load environment variables
   runApp(const MyApp());
 }
 
@@ -22,16 +25,16 @@ class MyApp extends StatelessWidget {
           primaryContainer: const Color(0xFF034C8C), // Darker navy
           secondary: Colors.yellow, // Accent color
           secondaryContainer: Colors.yellow[700],
-          
+
           // Surface colors
           surface: Colors.white, // Main background
           surfaceContainerHighest: Colors.grey[100], // For cards/text fields
-          
+
           // Text colors
           onPrimary: Colors.white, // Text on primary color
           onSecondary: Colors.black, // Text on yellow
           onSurface: const Color(0xFF001F54), // Main text color
-          
+
           // Other colors
           outline: Colors.grey[400], // Borders
           shadow: Colors.grey.withAlpha((0.2 * 255).toInt()),
@@ -75,8 +78,7 @@ class MyApp extends StatelessWidget {
       ),
       home: const SplashScreen(),
       routes: {
-        '/login': (context) => const LoginPage(), // Register the login route
-        // Add other routes here if needed
+        '/login': (context) => const LoginPage(),
       },
     );
   }
