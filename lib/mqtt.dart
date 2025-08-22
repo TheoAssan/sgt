@@ -34,6 +34,14 @@ class AdafruitIOService {
   final StreamController<String> _rawLightStateController = StreamController<String>.broadcast();
   Stream<String> get rawLightStateStream => _rawLightStateController.stream;
 
+  // StreamController for motion data messages
+  final StreamController<String> _motionDataController = StreamController<String>.broadcast();
+  Stream<String> get motionDataStream => _motionDataController.stream;
+
+  // StreamController for override feed messages
+  final StreamController<String> _overrideController = StreamController<String>.broadcast();
+  Stream<String> get overrideStream => _overrideController.stream;
+
   AdafruitIOService({this.showNotification}) {
     final clientId = 'flutterClient_${DateTime.now().second}';
     _client = MqttServerClient.withPort(
@@ -65,20 +73,38 @@ class AdafruitIOService {
     }
 
     if (_client.connectionStatus?.state == MqttConnectionState.connected) {
-      // Optional: auto-subscribe so you can listen for device echoes
+      // Subscribe to light state feed
       _client.subscribe(defaultFeed, MqttQos.atLeastOnce);
+      
+      // Subscribe to motion data feed
+      final motionDataFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.data-log';
+      _client.subscribe(motionDataFeed, MqttQos.atLeastOnce);
+      
+      // Subscribe to override feed
+      final overrideFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.override';
+      _client.subscribe(overrideFeed, MqttQos.atLeastOnce);
+      
       _client.updates?.listen((events) {
         final rec = events.first;
         final msg = rec.payload as MqttPublishMessage;
         final text = MqttPublishPayload.bytesToStringAsString(msg.payload.message);
-        _rawLightStateController.add(text); // <-- broadcast raw message only, no notification
-
-        // Broadcast light state (supports MANUAL, AUTO, or plain ON/OFF)
-        final clean = text.trim().toUpperCase();
-        if (clean == 'LIGHT ON(MANUAL)' || clean == 'LIGHT ON(AUTO)' || clean == 'ON') {
-          _lightStateController.add(true);
-        } else if (clean == 'LIGHT OFF(MANUAL)' || clean == 'LIGHT OFF(AUTO)' || clean == 'OFF') {
-          _lightStateController.add(false);
+        final topic = rec.topic;
+        
+        // Route messages to appropriate streams based on topic
+        if (topic == defaultFeed) {
+          _rawLightStateController.add(text);
+          
+          // Broadcast light state (supports MANUAL, AUTO, or plain ON/OFF)
+          final clean = text.trim().toUpperCase();
+          if (clean == 'LIGHT ON(MANUAL)' || clean == 'LIGHT ON(AUTO)' || clean == 'ON') {
+            _lightStateController.add(true);
+          } else if (clean == 'LIGHT OFF(MANUAL)' || clean == 'LIGHT OFF(AUTO)' || clean == 'OFF') {
+            _lightStateController.add(false);
+          }
+        } else if (topic == motionDataFeed) {
+          _motionDataController.add(text);
+        } else if (topic == overrideFeed) {
+          _overrideController.add(text);
         }
       });
       return true;
@@ -122,6 +148,50 @@ class AdafruitIOService {
     }
   }
 
+  /// Fetch historical data from Adafruit IO REST API for the motion data feed
+  Future<List<Map<String, dynamic>>> fetchMotionDataHistory({int maxResults = 100}) async {
+    final url = Uri.https(
+      'io.adafruit.com',
+      '/api/v2/$username/feeds/ld2410c-feeds.data-log/data',
+      {'limit': maxResults.toString()},
+    );
+    final response = await http.get(
+      url,
+      headers: {'X-AIO-Key': aioKey},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map<Map<String, dynamic>>((item) => {
+        'created_at': item['created_at'],
+        'value': item['value'],
+      }).toList();
+    } else {
+      throw Exception('Failed to fetch motion data history: \\${response.statusCode}');
+    }
+  }
+
+  /// Fetch historical data from Adafruit IO REST API for the override feed
+  Future<List<Map<String, dynamic>>> fetchOverrideHistory({int maxResults = 100}) async {
+    final url = Uri.https(
+      'io.adafruit.com',
+      '/api/v2/$username/feeds/ld2410c-feeds.override/data',
+      {'limit': maxResults.toString()},
+    );
+    final response = await http.get(
+      url,
+      headers: {'X-AIO-Key': aioKey},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map<Map<String, dynamic>>((item) => {
+        'created_at': item['created_at'],
+        'value': item['value'],
+      }).toList();
+    } else {
+      throw Exception('Failed to fetch override history: \\${response.statusCode}');
+    }
+  }
+
   void _onConnected() => showNotification?.call('🔗 MQTT Connected');
   void _onDisconnected() => showNotification?.call('🔌 MQTT Disconnected');
   void _onSubscribed(String topic) {/* No notification */}
@@ -129,6 +199,8 @@ class AdafruitIOService {
   void dispose() {
     _lightStateController.close();
     _rawLightStateController.close();
+    _motionDataController.close();
+    _overrideController.close();
     _client.disconnect();
   }
 

@@ -213,7 +213,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      drawer: Sidebar(),
+      drawer: Sidebar(mqttService: mqttService),
       backgroundColor: const Color.fromARGB(255, 231, 230, 230),
       appBar: AppBar(
         backgroundColor: const Color(0xFF001F54),

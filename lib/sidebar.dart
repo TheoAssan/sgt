@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:sgt/settings.dart';
 import 'package:sgt/data_log.dart';
-import 'package:sgt/power_consumption.dart'; // Add this import
+import 'package:sgt/power_consumption.dart';
+import 'package:sgt/motiontracker.dart';
+import 'package:sgt/mqtt.dart';
 
 // ignore: use_key_in_widget_constructors
 class Sidebar extends StatelessWidget {
+  final AdafruitIOService? mqttService; // Add MQTT service parameter
+  
+  const Sidebar({super.key, this.mqttService});
+
   @override
   Widget build(BuildContext context) {
     return Drawer(
@@ -47,7 +53,7 @@ class Sidebar extends StatelessWidget {
                       context,
                       PageRouteBuilder(
                         transitionDuration: Duration(milliseconds: 450),
-                        pageBuilder: (context, animation, secondaryAnimation) => SettingsPage(),
+                        pageBuilder: (context, animation, secondaryAnimation) => SettingsPage(mqttService: mqttService),
                         transitionsBuilder: (context, animation, secondaryAnimation, child) {
                           const begin = Offset(1.0, 0.0); // Slide from right
                           const end = Offset.zero;
@@ -96,6 +102,30 @@ class Sidebar extends StatelessWidget {
                       PageRouteBuilder(
                         transitionDuration: Duration(milliseconds: 450),
                         pageBuilder: (context, animation, secondaryAnimation) => PowerConsumptionPage(),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(1.0, 0.0); // Slide from right
+                          const end = Offset.zero;
+                          const curve = Curves.ease;
+                          final tween = Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
+                          return SlideTransition(
+                            position: animation.drive(tween),
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.motion_photos_on, color: Color(0xFF001F54)),
+                  title: Text('Motion Tracker', style: TextStyle(color: Colors.black)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      context,
+                      PageRouteBuilder(
+                        transitionDuration: Duration(milliseconds: 450),
+                        pageBuilder: (context, animation, secondaryAnimation) => MotionTrackerPage(),
                         transitionsBuilder: (context, animation, secondaryAnimation, child) {
                           const begin = Offset(1.0, 0.0); // Slide from right
                           const end = Offset.zero;
