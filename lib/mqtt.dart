@@ -46,8 +46,17 @@ class AdafruitIOService {
   final StreamController<String> _powerDataController = StreamController<String>.broadcast();
   Stream<String> get powerDataStream => _powerDataController.stream;
 
+  // StreamController for energy data messages
+  final StreamController<String> _energyDataController = StreamController<String>.broadcast();
+  Stream<String> get energyDataStream => _energyDataController.stream;
+
+  // Store energy consumption data for calculations
+  final List<Map<String, dynamic>> _energyHistory = [];
+
+  // Bulb wattage (set as 6 W, change as needed)
+  final double bulbWattage = 6.0;
+
   AdafruitIOService({this.showNotification}) {
-    final clientId = 'flutterClient_${DateTime.now().second}';
     _client = MqttServerClient.withPort(
         server, 'flutterClient${DateTime.now().second}', port)
       ..logging(on: false)
@@ -77,32 +86,25 @@ class AdafruitIOService {
     }
 
     if (_client.connectionStatus?.state == MqttConnectionState.connected) {
-      // Subscribe to light state feed
+      // Subscribe to feeds
       _client.subscribe(defaultFeed, MqttQos.atLeastOnce);
-      
-      // Subscribe to motion data feed
       final motionDataFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.data-log';
       _client.subscribe(motionDataFeed, MqttQos.atLeastOnce);
-      
-      // Subscribe to override feed
       final overrideFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.override';
       _client.subscribe(overrideFeed, MqttQos.atLeastOnce);
-      
-      // Subscribe to power feed
       final powerFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.power';
       _client.subscribe(powerFeed, MqttQos.atLeastOnce);
-      
+      final energyFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.power';
+      _client.subscribe(energyFeed, MqttQos.atLeastOnce);
+
       _client.updates?.listen((events) {
         final rec = events.first;
         final msg = rec.payload as MqttPublishMessage;
         final text = MqttPublishPayload.bytesToStringAsString(msg.payload.message);
         final topic = rec.topic;
-        
-        // Route messages to appropriate streams based on topic
+
         if (topic == defaultFeed) {
           _rawLightStateController.add(text);
-          
-          // Broadcast light state (supports MANUAL, AUTO, or plain ON/OFF)
           final clean = text.trim().toUpperCase();
           if (clean == 'LIGHT ON(MANUAL)' || clean == 'LIGHT ON(AUTO)' || clean == 'ON') {
             _lightStateController.add(true);
@@ -115,6 +117,11 @@ class AdafruitIOService {
           _overrideController.add(text);
         } else if (topic == powerFeed) {
           _powerDataController.add(text);
+        } else if (topic == energyFeed) {
+          // Convert NodeMCU energy values to kWh using bulb wattage and elapsed time
+          final adjustedEnergy = _calculateEnergyFromWatts(double.tryParse(text) ?? 0.0);
+          _energyDataController.add(adjustedEnergy.toStringAsFixed(6));
+          _storeEnergyData(adjustedEnergy.toString(), DateTime.now());
         }
       });
       return true;
@@ -125,7 +132,29 @@ class AdafruitIOService {
     }
   }
 
-  /// Publish a text message to a topic (uses Uint8Buffer as required by mqtt_client).
+  /// Convert raw watt value to kWh based on bulb wattage and elapsed time
+  double _calculateEnergyFromWatts(double nodeMCUValue) {
+    // NodeMCU value represents instantaneous watts (W)
+    // kWh = W × hours / 1000
+    // For small time steps, assume ~1 second interval: hours = 1 / 3600
+    double hours = 1 / 3600;
+    return bulbWattage * hours; // 6W × 1 sec ≈ 0.001666 kWh
+  }
+
+  void _storeEnergyData(String energyValue, DateTime timestamp) {
+    try {
+      final value = double.tryParse(energyValue) ?? 0.0;
+      _energyHistory.add({
+        'timestamp': timestamp,
+        'value': value,
+        'created_at': timestamp.toIso8601String(),
+      });
+      if (_energyHistory.length > 1000) _energyHistory.removeAt(0);
+    } catch (e) {
+      showNotification?.call('❌ Error storing energy data: $e');
+    }
+  }
+
   void publish(String topic, String message) {
     if (_client.connectionStatus?.state != MqttConnectionState.connected) {
       showNotification?.call('⚠️ Not connected to MQTT');
@@ -136,157 +165,122 @@ class AdafruitIOService {
     _client.publishMessage(topic, MqttQos.atLeastOnce, builder.payload!);
   }
 
-  /// Fetch historical data from Adafruit IO REST API for the light-state feed
   Future<List<Map<String, dynamic>>> fetchLightStateHistory({int maxResults = 100}) async {
-    final url = Uri.https(
-      'io.adafruit.com',
-      '/api/v2/$username/feeds/ld2410c-feeds.light-state/data',
-      {'limit': maxResults.toString()},
-    );
-    final response = await http.get(
-      url,
-      headers: {'X-AIO-Key': aioKey},
-    );
+    final url = Uri.https('io.adafruit.com', '/api/v2/$username/feeds/ld2410c-feeds.light-state/data', {'limit': maxResults.toString()});
+    final response = await http.get(url, headers: {'X-AIO-Key': aioKey});
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.map<Map<String, dynamic>>((item) => {
         'created_at': item['created_at'],
         'value': item['value'],
       }).toList();
-    } else {
-      throw Exception('Failed to fetch history: \\${response.statusCode}');
-    }
+    } else throw Exception('Failed to fetch history: ${response.statusCode}');
   }
 
-  /// Fetch historical data from Adafruit IO REST API for the motion data feed
+  // --- other fetch*History methods unchanged ---
   Future<List<Map<String, dynamic>>> fetchMotionDataHistory({int maxResults = 100}) async {
-    final url = Uri.https(
-      'io.adafruit.com',
-      '/api/v2/$username/feeds/ld2410c-feeds.data-log/data',
-      {'limit': maxResults.toString()},
-    );
-    final response = await http.get(
-      url,
-      headers: {'X-AIO-Key': aioKey},
-    );
+    final url = Uri.https('io.adafruit.com', '/api/v2/$username/feeds/ld2410c-feeds.data-log/data', {'limit': maxResults.toString()});
+    final response = await http.get(url, headers: {'X-AIO-Key': aioKey});
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.map<Map<String, dynamic>>((item) => {
         'created_at': item['created_at'],
         'value': item['value'],
       }).toList();
-    } else {
-      throw Exception('Failed to fetch motion data history: \\${response.statusCode}');
-    }
+    } else throw Exception('Failed to fetch motion data history: ${response.statusCode}');
   }
 
-  /// Fetch historical data from Adafruit IO REST API for the override feed
   Future<List<Map<String, dynamic>>> fetchOverrideHistory({int maxResults = 100}) async {
-    final url = Uri.https(
-      'io.adafruit.com',
-      '/api/v2/$username/feeds/ld2410c-feeds.override/data',
-      {'limit': maxResults.toString()},
-    );
-    final response = await http.get(
-      url,
-      headers: {'X-AIO-Key': aioKey},
-    );
+    final url = Uri.https('io.adafruit.com', '/api/v2/$username/feeds/ld2410c-feeds.override/data', {'limit': maxResults.toString()});
+    final response = await http.get(url, headers: {'X-AIO-Key': aioKey});
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.map<Map<String, dynamic>>((item) => {
         'created_at': item['created_at'],
         'value': item['value'],
       }).toList();
-    } else {
-      throw Exception('Failed to fetch override history: \\${response.statusCode}');
-    }
+    } else throw Exception('Failed to fetch override history: ${response.statusCode}');
   }
 
-  /// Fetch historical data from Adafruit IO REST API for the power feed
   Future<List<Map<String, dynamic>>> fetchPowerHistory({int maxResults = 100}) async {
-    final url = Uri.https(
-      'io.adafruit.com',
-      '/api/v2/$username/feeds/ld2410c-feeds.power/data',
-      {'limit': maxResults.toString()},
-    );
-    final response = await http.get(
-      url,
-      headers: {'X-AIO-Key': aioKey},
-    );
+    final url = Uri.https('io.adafruit.com', '/api/v2/$username/feeds/ld2410c-feeds.power/data', {'limit': maxResults.toString()});
+    final response = await http.get(url, headers: {'X-AIO-Key': aioKey});
     if (response.statusCode == 200) {
       final List<dynamic> data = json.decode(response.body);
       return data.map<Map<String, dynamic>>((item) => {
         'created_at': item['created_at'],
         'value': item['value'],
       }).toList();
-    } else {
-      throw Exception('Failed to fetch power history: \\${response.statusCode}');
-    }
+    } else throw Exception('Failed to fetch power history: ${response.statusCode}');
   }
 
-  /// Calculate power consumption statistics from historical data
+  Future<List<Map<String, dynamic>>> fetchEnergyHistory({int maxResults = 100}) async {
+    final url = Uri.https('io.adafruit.com', '/api/v2/$username/feeds/ld2410c-feeds.power/data', {'limit': maxResults.toString()});
+    final response = await http.get(url, headers: {'X-AIO-Key': aioKey});
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map<Map<String, dynamic>>((item) => {
+        'created_at': item['created_at'],
+        'value': item['value'],
+      }).toList();
+    } else throw Exception('Failed to fetch energy history: ${response.statusCode}');
+  }
+
   Future<Map<String, double>> calculatePowerStats() async {
     try {
-      final powerHistory = await fetchPowerHistory(maxResults: 1000);
-      
-      if (powerHistory.isEmpty) {
-        return {
-          'today': 0.0,
-          'thisWeek': 0.0,
-          'thisMonth': 0.0,
-          'total': 0.0,
-        };
+      final energyHistory = await fetchEnergyHistory(maxResults: 1000);
+      final allEnergyData = [..._energyHistory, ...energyHistory.map((item) => {
+        'timestamp': DateTime.parse(item['created_at']),
+        'value': double.tryParse(item['value'].toString()) ?? 0.0,
+        'created_at': item['created_at'],
+      })];
+
+      if (allEnergyData.isEmpty) {
+        return {'today': 0.0, 'thisWeek': 0.0, 'thisMonth': 0.0, 'total': 0.0};
       }
 
+      allEnergyData.sort((a, b) => a['timestamp'].compareTo(b['timestamp']));
       final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final weekAgo = today.subtract(Duration(days: 7));
-      final monthAgo = DateTime(now.year, now.month - 1, now.day);
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final weekStart = todayStart.subtract(Duration(days: now.weekday - 1));
+      final monthStart = DateTime(now.year, now.month, 1);
 
       double todayConsumption = 0.0;
       double weekConsumption = 0.0;
       double monthConsumption = 0.0;
       double totalConsumption = 0.0;
 
-      for (final entry in powerHistory) {
-        final timestamp = DateTime.parse(entry['created_at']);
-        final value = double.tryParse(entry['value'].toString()) ?? 0.0;
-        
-        totalConsumption += value;
-        
-        if (timestamp.isAfter(today)) {
-          todayConsumption += value;
-        }
-        
-        if (timestamp.isAfter(weekAgo)) {
-          weekConsumption += value;
-        }
-        
-        if (timestamp.isAfter(monthAgo)) {
-          monthConsumption += value;
-        }
+      for (int i = 0; i < allEnergyData.length; i++) {
+        final currentEntry = allEnergyData[i];
+        final currentValue = currentEntry['value'] as double;
+        final currentTime = currentEntry['timestamp'] as DateTime;
+
+        if (i == allEnergyData.length - 1) totalConsumption = currentValue;
+
+        if (currentTime.isAfter(todayStart)) todayConsumption = currentValue - _getBaselineValue(allEnergyData, todayStart);
+        if (currentTime.isAfter(weekStart)) weekConsumption = currentValue - _getBaselineValue(allEnergyData, weekStart);
+        if (currentTime.isAfter(monthStart)) monthConsumption = currentValue - _getBaselineValue(allEnergyData, monthStart);
       }
 
-      return {
-        'today': todayConsumption,
-        'thisWeek': weekConsumption,
-        'thisMonth': monthConsumption,
-        'total': totalConsumption,
-      };
+      return {'today': todayConsumption, 'thisWeek': weekConsumption, 'thisMonth': monthConsumption, 'total': totalConsumption};
     } catch (e) {
       showNotification?.call('❌ Failed to fetch power stats: $e');
-      return {
-        'today': 0.0,
-        'thisWeek': 0.0,
-        'thisMonth': 0.0,
-        'total': 0.0,
-      };
+      return {'today': 0.0, 'thisWeek': 0.0, 'thisMonth': 0.0, 'total': 0.0};
     }
+  }
+
+  double _getBaselineValue(List<Map<String, dynamic>> energyData, DateTime periodStart) {
+    for (int i = energyData.length - 1; i >= 0; i--) {
+      final entry = energyData[i];
+      final entryTime = entry['timestamp'] as DateTime;
+      if (entryTime.isBefore(periodStart)) return entry['value'] as double;
+    }
+    return 0.0;
   }
 
   void _onConnected() => showNotification?.call('🔗 MQTT Connected');
   void _onDisconnected() => showNotification?.call('🔌 MQTT Disconnected');
-  void _onSubscribed(String topic) {/* No notification */}
+  void _onSubscribed(String topic) {}
 
   void dispose() {
     _lightStateController.close();
@@ -294,6 +288,7 @@ class AdafruitIOService {
     _motionDataController.close();
     _overrideController.close();
     _powerDataController.close();
+    _energyDataController.close();
     _client.disconnect();
   }
 

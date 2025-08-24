@@ -46,9 +46,7 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
-          onProgress: (int progress) {
-            // Update loading bar.
-          },
+          onProgress: (int progress) {},
           onPageStarted: (String url) {
             setState(() {
               _isLoading = true;
@@ -141,7 +139,6 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
       ),
       child: Stack(
         children: [
-          // Background pattern
           Positioned(
             top: -10,
             right: -10,
@@ -154,7 +151,6 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
               ),
             ),
           ),
-          // Content
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -292,14 +288,10 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
     );
   }
 
+  // --- Convert all power values to kWh ---
   String _formatPowerValue(double value) {
-    if (value < 1.0) {
-      return '${(value * 1000).toStringAsFixed(0)} mWh';
-    } else if (value < 1000) {
-      return '${value.toStringAsFixed(1)} Wh';
-    } else {
-      return '${(value / 1000).toStringAsFixed(2)} kWh';
-    }
+    double kwhValue = value / 1000.0; // convert Wh to kWh
+    return '${kwhValue.toStringAsFixed(3)} kWh';
   }
 
   @override
@@ -320,7 +312,6 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
       ),
       body: Column(
         children: [
-          // Dashboard takes 45% of the space
           SizedBox(
             height: MediaQuery.of(context).size.height * 0.45,
             child: Stack(
@@ -333,15 +324,12 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
               ],
             ),
           ),
-          // Spacing between WebView and power cards
           const SizedBox(height: 20),
-          // Power cards section
           Expanded(
             child: Container(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  // Top row - Today and This Week
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -360,7 +348,6 @@ class _PowerConsumptionPageState extends State<PowerConsumptionPage> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Bottom row - This Month and Total
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [

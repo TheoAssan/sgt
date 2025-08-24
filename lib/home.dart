@@ -310,8 +310,8 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildPowerMetric(icon: Icons.flash_on, value: '5 kW/h', label: 'This week'),
-                _buildPowerMetric(icon: Icons.electrical_services, value: '120 kW/h', label: 'Total'),
+                _buildPowerMetric(icon: Icons.flash_on, value: '3 kW/h', label: 'This week'),
+                _buildPowerMetric(icon: Icons.electrical_services, value: '4 kW/h', label: 'Total'),
               ],
             ),
           ],
