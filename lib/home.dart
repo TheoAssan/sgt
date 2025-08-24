@@ -303,15 +303,15 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Room Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Color(0xFF001F54))),
+            const Text('Power Consumption', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w600, color: Color(0xFF001F54))),
             const SizedBox(height: 2),
-            const Text('8‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
+            const Text('6‑watt smart light', style: TextStyle(fontSize: 14, color: Colors.black)),
             const SizedBox(height: 35),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildPowerMetric(icon: Icons.flash_on, value: '5 kWh', label: 'This week'),
-                _buildPowerMetric(icon: Icons.electrical_services, value: '120 kWh', label: 'Total'),
+                _buildPowerMetric(icon: Icons.flash_on, value: '5 kW/h', label: 'This week'),
+                _buildPowerMetric(icon: Icons.electrical_services, value: '120 kW/h', label: 'Total'),
               ],
             ),
           ],

@@ -42,6 +42,10 @@ class AdafruitIOService {
   final StreamController<String> _overrideController = StreamController<String>.broadcast();
   Stream<String> get overrideStream => _overrideController.stream;
 
+  // StreamController for power data messages
+  final StreamController<String> _powerDataController = StreamController<String>.broadcast();
+  Stream<String> get powerDataStream => _powerDataController.stream;
+
   AdafruitIOService({this.showNotification}) {
     final clientId = 'flutterClient_${DateTime.now().second}';
     _client = MqttServerClient.withPort(
@@ -84,6 +88,10 @@ class AdafruitIOService {
       final overrideFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.override';
       _client.subscribe(overrideFeed, MqttQos.atLeastOnce);
       
+      // Subscribe to power feed
+      final powerFeed = '${dotenv.env['AIO_USERNAME']}/feeds/ld2410c-feeds.power';
+      _client.subscribe(powerFeed, MqttQos.atLeastOnce);
+      
       _client.updates?.listen((events) {
         final rec = events.first;
         final msg = rec.payload as MqttPublishMessage;
@@ -105,6 +113,8 @@ class AdafruitIOService {
           _motionDataController.add(text);
         } else if (topic == overrideFeed) {
           _overrideController.add(text);
+        } else if (topic == powerFeed) {
+          _powerDataController.add(text);
         }
       });
       return true;
@@ -192,6 +202,88 @@ class AdafruitIOService {
     }
   }
 
+  /// Fetch historical data from Adafruit IO REST API for the power feed
+  Future<List<Map<String, dynamic>>> fetchPowerHistory({int maxResults = 100}) async {
+    final url = Uri.https(
+      'io.adafruit.com',
+      '/api/v2/$username/feeds/ld2410c-feeds.power/data',
+      {'limit': maxResults.toString()},
+    );
+    final response = await http.get(
+      url,
+      headers: {'X-AIO-Key': aioKey},
+    );
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map<Map<String, dynamic>>((item) => {
+        'created_at': item['created_at'],
+        'value': item['value'],
+      }).toList();
+    } else {
+      throw Exception('Failed to fetch power history: \\${response.statusCode}');
+    }
+  }
+
+  /// Calculate power consumption statistics from historical data
+  Future<Map<String, double>> calculatePowerStats() async {
+    try {
+      final powerHistory = await fetchPowerHistory(maxResults: 1000);
+      
+      if (powerHistory.isEmpty) {
+        return {
+          'today': 0.0,
+          'thisWeek': 0.0,
+          'thisMonth': 0.0,
+          'total': 0.0,
+        };
+      }
+
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final weekAgo = today.subtract(Duration(days: 7));
+      final monthAgo = DateTime(now.year, now.month - 1, now.day);
+
+      double todayConsumption = 0.0;
+      double weekConsumption = 0.0;
+      double monthConsumption = 0.0;
+      double totalConsumption = 0.0;
+
+      for (final entry in powerHistory) {
+        final timestamp = DateTime.parse(entry['created_at']);
+        final value = double.tryParse(entry['value'].toString()) ?? 0.0;
+        
+        totalConsumption += value;
+        
+        if (timestamp.isAfter(today)) {
+          todayConsumption += value;
+        }
+        
+        if (timestamp.isAfter(weekAgo)) {
+          weekConsumption += value;
+        }
+        
+        if (timestamp.isAfter(monthAgo)) {
+          monthConsumption += value;
+        }
+      }
+
+      return {
+        'today': todayConsumption,
+        'thisWeek': weekConsumption,
+        'thisMonth': monthConsumption,
+        'total': totalConsumption,
+      };
+    } catch (e) {
+      showNotification?.call('❌ Failed to fetch power stats: $e');
+      return {
+        'today': 0.0,
+        'thisWeek': 0.0,
+        'thisMonth': 0.0,
+        'total': 0.0,
+      };
+    }
+  }
+
   void _onConnected() => showNotification?.call('🔗 MQTT Connected');
   void _onDisconnected() => showNotification?.call('🔌 MQTT Disconnected');
   void _onSubscribed(String topic) {/* No notification */}
@@ -201,6 +293,7 @@ class AdafruitIOService {
     _rawLightStateController.close();
     _motionDataController.close();
     _overrideController.close();
+    _powerDataController.close();
     _client.disconnect();
   }
 
